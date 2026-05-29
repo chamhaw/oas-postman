@@ -1,0 +1,73 @@
+version: 2
+
+project_name: oas-postman
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: oas-postman
+    main: ./cmd/oas-postman
+    binary: oas-postman
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    ids:
+      - oas-postman
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: chamhaw
+    name: oas-postman
+
+homebrew_casks:
+  - name: oas-postman
+    ids:
+      - default
+    binaries:
+      - oas-postman
+    homepage: https://github.com/chamhaw/oas-postman
+    description: Sync OpenAPI/Swagger specs into Postman v3 directory collections while preserving examples
+    license: MIT
+    repository:
+      owner: chamhaw
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaserbot@users.noreply.github.com
