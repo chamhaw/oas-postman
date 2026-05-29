@@ -6,17 +6,18 @@ It is built for the workflow where the spec is the source of truth for request d
 
 ## Install
 
-From source:
+For local development, install SDKs with mise:
 
 ```sh
-go install github.com/chamhaw/oas-postman/cmd/oas-postman@latest
+mise install
+mise run check
 ```
 
-Homebrew release publishing is prepared through GoReleaser. Once the tap exists:
+For users installing the released CLI:
 
 ```sh
 brew tap chamhaw/tap
-brew install --cask oas-postman
+brew install oas-postman
 ```
 
 ## Usage
@@ -57,4 +58,6 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow uses GoReleaser to build binaries and publish a Homebrew cask into `chamhaw/homebrew-tap`. Set `TAP_GITHUB_TOKEN` with write access to that tap repository.
+The release workflow creates a GitHub release and updates `chamhaw/homebrew-tap/Formula/oas-postman.rb`. Set `TAP_GITHUB_TOKEN` with write access to that tap repository.
+
+Development and CI SDKs are managed by mise via `.mise.toml`. The Homebrew formula still uses Homebrew's normal Go build dependency because formula builds must be reproducible for users who do not have this repository's mise environment.

@@ -9,28 +9,82 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Set up mise
+        uses: jdx/mise-action@v2
 
       - name: Run tests
-        run: go test ./...
+        run: mise run test
 
-      - name: Release
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
+      - name: Build
+        run: |
+          mkdir -p dist
+          mise exec -- go build \
+            -ldflags "-s -w -X main.version=${GITHUB_REF_NAME} -X main.commit=${GITHUB_SHA} -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -o dist/oas-postman \
+            ./cmd/oas-postman
+
+      - name: Create GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Release ${GITHUB_REF_NAME}" \
+          || gh release edit "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes "Release ${GITHUB_REF_NAME}"
+
+      - name: Publish Homebrew formula
+        env:
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${TAP_GITHUB_TOKEN}"
+
+          tag="${GITHUB_REF_NAME}"
+          url="https://github.com/chamhaw/oas-postman/archive/refs/tags/${tag}.tar.gz"
+          sha256="$(curl -fsSL "${url}" | sha256sum | awk '{print $1}')"
+
+          git clone "https://x-access-token:${TAP_GITHUB_TOKEN}@github.com/chamhaw/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+
+          cat > tap/Formula/oas-postman.rb <<EOF
+          class OasPostman < Formula
+            desc "Sync OpenAPI/Swagger specs into Postman v3 directory collections while preserving examples"
+            homepage "https://github.com/chamhaw/oas-postman"
+            url "${url}"
+            sha256 "${sha256}"
+            license "MIT"
+
+            depends_on "go" => :build
+
+            def install
+              system "go", "build", *std_go_args(ldflags: "-s -w -X main.version=#{version}"), "./cmd/oas-postman"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/oas-postman version")
+            end
+          end
+          EOF
+
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/oas-postman.rb
+          if git diff --cached --quiet; then
+            echo "Formula already up to date"
+          else
+            git commit -m "oas-postman ${tag}"
+            git push origin HEAD:main
+          fi
