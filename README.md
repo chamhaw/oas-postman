@@ -32,7 +32,7 @@ oas-postman sync \
 The sync command:
 
 - regenerates every request definition from the spec
-- matches old examples by `operationId`, then by `METHOD + normalized path`
+- matches old examples only by `METHOD + normalized path`
 - moves old requests that no longer exist in the spec into `Deprecated/`
 - writes `x-postman-sync` metadata into generated request/example YAML files
 

@@ -84,6 +84,73 @@ response:
 	}
 }
 
+func TestSyncDoesNotFallbackToOperationID(t *testing.T) {
+	tmp := t.TempDir()
+	specPath := filepath.Join(tmp, "swagger.yaml")
+	outDir := filepath.Join(tmp, "collection")
+	writeString(t, specPath, `
+swagger: "2.0"
+info:
+  title: Example API
+paths:
+  /api/new-things/{id}:
+    get:
+      tags: [Things]
+      summary: Get thing at new path
+      operationId: getThing
+      parameters:
+        - name: id
+          in: path
+          type: string
+          required: true
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+`)
+	writeString(t, filepath.Join(outDir, "Things", "Old path.request.yaml"), `$kind: http-request
+name: Old path
+operationId: getThing
+url: "{{baseUrl}}/api/old-things/:id"
+method: GET
+examples: "./.resources/Old path.resources/examples"
+`)
+	writeString(t, filepath.Join(outDir, "Things", ".resources", "Old path.resources", "examples", "Manual.example.yaml"), `$kind: http-example
+request:
+  url: "{{baseUrl}}/api/old-things/:id"
+  method: GET
+response:
+  statusCode: 200
+  body:
+    type: json
+    content: '{"id":"old-path-manual"}'
+`)
+
+	result, err := Sync(Options{SpecPath: specPath, OutputDir: outDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.PreservedExampleCount != 0 {
+		t.Fatalf("preserved examples = %d, want 0", result.PreservedExampleCount)
+	}
+	if result.DeprecatedCount != 1 {
+		t.Fatalf("deprecated = %d, want 1", result.DeprecatedCount)
+	}
+
+	generatedManual := filepath.Join(outDir, "Things", ".resources", "Get thing at new path.resources", "examples", "Manual.example.yaml")
+	if _, err := os.Stat(generatedManual); err == nil {
+		t.Fatalf("manual example should not be merged by operationId: %s", generatedManual)
+	}
+	deprecatedManual := readString(t, filepath.Join(outDir, "Deprecated", ".resources", "Old path.resources", "examples", "Manual.example.yaml"))
+	if !strings.Contains(deprecatedManual, "old-path-manual") {
+		t.Fatalf("manual example should be preserved under Deprecated:\n%s", deprecatedManual)
+	}
+}
+
 func TestLoadDocumentOpenAPI3(t *testing.T) {
 	tmp := t.TempDir()
 	specPath := filepath.Join(tmp, "openapi.yaml")

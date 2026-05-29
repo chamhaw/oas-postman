@@ -89,15 +89,9 @@ func validateOptions(opts Options) error {
 func failOnOrphans(doc Document, existing *existingCollection) error {
 	current := map[string]bool{}
 	for _, op := range doc.Operations {
-		if op.ID != "" {
-			current["id:"+op.ID] = true
-		}
 		current["route:"+operationKey(op.Method, op.Path)] = true
 	}
 	for _, req := range existing.orphanables {
-		if req.OperationID != "" && current["id:"+req.OperationID] {
-			continue
-		}
 		if current["route:"+operationKey(req.Method, req.Path)] {
 			continue
 		}

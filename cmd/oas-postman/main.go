@@ -98,6 +98,6 @@ Usage:
 
 Sync behavior:
   - request definitions are regenerated from the spec
-  - existing examples are matched by operationId, then method + normalized path
+  - existing examples are matched only by method + normalized path
   - unmatched old requests are moved to Deprecated by default`)
 }

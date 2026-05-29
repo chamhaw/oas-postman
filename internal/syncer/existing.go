@@ -7,16 +7,14 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 type existingCollection struct {
-	byOperationID map[string]*existingRequest
-	byRoute       map[string]*existingRequest
-	orphanables   []*existingRequest
+	byRoute     map[string]*existingRequest
+	orphanables []*existingRequest
 }
 
 type existingRequest struct {
@@ -37,8 +35,7 @@ type exampleAsset struct {
 
 func collectExistingCollection(outputDir string) (*existingCollection, error) {
 	out := &existingCollection{
-		byOperationID: map[string]*existingRequest{},
-		byRoute:       map[string]*existingRequest{},
+		byRoute: map[string]*existingRequest{},
 	}
 	if _, err := os.Stat(outputDir); errors.Is(err, os.ErrNotExist) {
 		return out, nil
@@ -56,9 +53,6 @@ func collectExistingCollection(outputDir string) (*existingCollection, error) {
 			return fmt.Errorf("read existing request %s: %w", filePath, err)
 		}
 		out.orphanables = append(out.orphanables, req)
-		if req.OperationID != "" {
-			addExisting(out.byOperationID, req.OperationID, req)
-		}
 		if req.Method != "" && req.Path != "" {
 			addExisting(out.byRoute, operationKey(req.Method, req.Path), req)
 		}
@@ -98,7 +92,6 @@ func readExistingRequest(root, filePath string) (*existingRequest, error) {
 	req.OperationID = firstString(
 		asString(raw["operationId"]),
 		operationIDFromSyncMeta(raw["x-postman-sync"]),
-		operationIDFromDescription(asString(raw["description"])),
 	)
 
 	examplesPath := asString(raw["examples"])
@@ -117,14 +110,6 @@ func readExistingRequest(root, filePath string) (*existingRequest, error) {
 
 func operationIDFromSyncMeta(v any) string {
 	return asString(asMap(v)["operationId"])
-}
-
-func operationIDFromDescription(description string) string {
-	match := regexp.MustCompile(`(?i)\boperationId\s*:\s*([A-Za-z0-9_.-]+)`).FindStringSubmatch(description)
-	if len(match) < 2 {
-		return ""
-	}
-	return match[1]
 }
 
 func readExampleAssets(dir string) ([]exampleAsset, error) {
@@ -154,11 +139,6 @@ func readExampleAssets(dir string) ([]exampleAsset, error) {
 }
 
 func (e *existingCollection) match(op Operation) *existingRequest {
-	if op.ID != "" {
-		if req := e.byOperationID[op.ID]; req != nil {
-			return req
-		}
-	}
 	return e.byRoute[operationKey(op.Method, op.Path)]
 }
 
