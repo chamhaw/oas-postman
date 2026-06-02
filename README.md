@@ -24,9 +24,9 @@ brew install oas-postman
 
 ```sh
 oas-postman sync \
-  --spec docs/swagger.json \
-  --out "postman/collections/Sandbox Manager API" \
-  --name "Sandbox Manager API"
+  --spec path/to/openapi.yaml \
+  --out "postman/collections/My API" \
+  --name "My API"
 ```
 
 The sync command:
