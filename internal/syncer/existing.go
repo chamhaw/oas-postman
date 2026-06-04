@@ -66,8 +66,33 @@ func collectExistingCollection(outputDir string) (*existingCollection, error) {
 
 func addExisting(index map[string]*existingRequest, key string, req *existingRequest) {
 	current := index[key]
-	if current == nil || (current.Deprecated && !req.Deprecated) {
+	if current == nil {
 		index[key] = req
+		return
+	}
+
+	// Duplicate route detected. Prefer:
+	// 1. Non-deprecated over deprecated
+	// 2. Request with more examples over request with fewer
+	// 3. Keep current otherwise (first encountered wins)
+	if current.Deprecated && !req.Deprecated {
+		fmt.Fprintf(os.Stderr, "WARN: Duplicate route %s: replacing deprecated %q with %q\n", key, current.Name, req.Name)
+		index[key] = req
+		return
+	}
+	if !current.Deprecated && req.Deprecated {
+		// Keep current (non-deprecated)
+		return
+	}
+
+	// Both deprecated or both non-deprecated: prefer the one with more examples
+	if len(req.Examples) > len(current.Examples) {
+		fmt.Fprintf(os.Stderr, "WARN: Duplicate route %s: replacing %q (%d examples) with %q (%d examples)\n",
+			key, current.Name, len(current.Examples), req.Name, len(req.Examples))
+		index[key] = req
+	} else {
+		fmt.Fprintf(os.Stderr, "WARN: Duplicate route %s: keeping %q (%d examples) over %q (%d examples)\n",
+			key, current.Name, len(current.Examples), req.Name, len(req.Examples))
 	}
 }
 
